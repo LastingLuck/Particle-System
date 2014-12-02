@@ -10,29 +10,33 @@ class Particle {
         Particle(const glm::vec3& position, const glm::vec3& velocity, 
                  const glm::vec3& color);
         Particle(const glm::vec3& position, const glm::vec3& velocity, const glm::vec3& color,
-                 float life, float liferand, float grav);
+                 float life, float liferand, const glm::vec3& grav);
+        Particle(const glm::vec3& position, const glm::vec3& velocity, const glm::vec3& color,
+                 float life, float liferand, float colrand, float dirrand, const glm::vec3& grav);
         
         bool update(); //< returns false if the particle is to be destroyed
         
         void setLifetime(float life) { lifetime = life; }
-        void setLifeRandomness(float rand) { ltrand = rand; }
-        void setGravity(float grav) { gravity = grav; }
+        //void setLifeRandomness(float rand) { ltrand = rand; }
+        void setGravity(float grav) { gravity = glm::vec3(0, grav, 0); }
         void setPosition(const glm::vec3& position) { pos = position; }
-        void setVelocity(const glm::vec3& velocity) { vel = velocity; }
+        void setVelocity(const glm::vec3& velocity) { vel = velocity; dir = glm::normalize(velocity); }
         void setColor(const glm::vec3& color) { col = color; }
         
         float getLifetime() const { return lifetime; }
-        float getLifeRandomness() const { return ltrand; }
-        float getGravity() const { return gravity; }
+        //float getLifeRandomness() const { return ltrand; }
+        glm::vec3 getGravity() const { return gravity; }
         glm::vec3 getPosition() const { return pos; }
+        glm::vec3 getDirection() const { return dir; }
         glm::vec3 getVelocity() const { return vel; }
         glm::vec3 getColor() const { return col; }
     private:
+        float termVel;
         float curLife;
         float lifetime;
-        float ltrand; //< randomness in lifespan. 0-1. Percent to check lifespan for ending
-        float gravity;
+        glm::vec3 gravity;
         glm::vec3 pos;
+        glm::vec3 dir;
         glm::vec3 vel;
         glm::vec3 col;
 };
@@ -47,18 +51,61 @@ class Emitter {
         void update();
         void pause();
         void resume();
+        void stop();
+        void start();
+        bool isPaused() { return paused; }
+        bool isRunning() { return run; }
         
-        void setParticleRate(int numPerSec) { numParticles = numPerSec; }
+        void setParticleRate(float numPerSec) { numParticles = numPerSec; }
+        void setDirection(const glm::vec3& direction) { dir = glm::normalize(direction); }
+        void setPosition(const glm::vec3& position) { pos = position; }
+        void setColor(const glm::vec3& color) { col = color; }
+        void setVelocity(float velocity) { vel = velocity; }
+        void setParticleLife(float life) { plife = life; }
+        void setLifeRand(float rand) { liferand = rand; }
+        void setColorRand(float rand) { colrand = rand; }
+        void setDirectionRand(float rand) { dirrand = rand; }
         
-        int getParticleRate() { return numParticles; }
+        float getParticleRate() const { return numParticles; }
+        glm::vec3 getPosition() const { return pos; }
+        glm::vec3 getDirection() const { return dir; }
+        glm::vec3 getColor() const { return col; }
+        float getVelocity() const { return vel; }
+        float getLifeTime() const { return plife; }
+        float getLifeRand() const { return liferand; }
+        float getColorRand() const { return colrand; }
+        float getDirectionRand() const { return dirrand; }
+        
+        std::vector<Particle> getParticles() const { return particles; }
+        std::vector<bool> getLiveList() const { return curParticles; }
     private:
         std::vector<bool> curParticles;
         std::vector<Particle> particles;
-        int numParticles;
+        float plife;
+        float numParticles;
         bool run;
+        bool paused;
         float lastTime;
         
+        //emitter data
+        glm::vec3 pos;
+        glm::vec3 dir;
+        glm::vec3 col;
+        float vel;
+        
+        //Particle refactor
+        int plimit;
+        float refTime;
+        float time;
+        float tottime;
+        
+        //Randomness
+        float liferand;
+        float colrand;
+        float dirrand;
+        
         void refactor();
+        void printParticlePos();
 };
 
 #endif
