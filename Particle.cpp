@@ -10,18 +10,13 @@ extern float difTime;
 
 Particle::Particle() {
     curLife = 0.0f;
-    float random = (float)rand() / RAND_MAX;
-    //random *= ltrand;
     lifetime = -1;
     //printf("Lifetime: %f\n", lifetime);
-    //lifetime = 5.0f;
     gravity = glm::vec3(0, -9.8f, 0);
     pos = glm::vec3(0);
-    //dir = glm::vec3(0, 1, 0);
     vel = glm::vec3(0, 5.0f, 0);
-    termVel = -5.0f;
-    col = glm::vec3(.5) + (random - 0.5f) * 0.3f;
-    //col = glm::vec3(.5);
+    termVel = -25.0f;
+    col = glm::vec3(.5);
 }
 
 Particle::Particle(const glm::vec3& position, const glm::vec3& velocity, 
@@ -30,17 +25,13 @@ Particle::Particle(const glm::vec3& position, const glm::vec3& velocity,
     curLife = 0.0f;
     float random = (float)rand() / RAND_MAX;
     lifetime = -1;
-    //printf("Lifetime: %f\n", lifetime);
-    //lifetime = 5.0f;
     gravity = glm::vec3(0, -9.8f, 0);
     pos = position;
-    //dir = glm::normalize(velocity);
     vel = velocity;
     #ifdef DEBUG
     printf("Starting Vel: (%f %f %f)\n", vel.x, vel.y, vel.z);
-    //printf("Starting Dir: (%f %f %f)\n", dir.x, dir.y, dir.z);
     #endif
-    termVel = -5.0f;
+    termVel = -25.0f;
     col = color + (random - 0.5f) * 0.3f;
     //col = color;
 }
@@ -50,24 +41,18 @@ Particle::Particle(const glm::vec3& position, const glm::vec3& velocity, const g
             
     curLife = 0.0f;
     float random = (float)rand() / RAND_MAX;
-    lifetime = 5.0f + (random - 0.5f) * liferand;
-    //printf("Lifetime: %f\n", lifetime);
-    //lifetime = life;
+    lifetime = life + (random * 2.0f - 1.0f) * liferand;
     gravity = grav;
     pos = position;
-    //dir = glm::normalize(velocity);
     vel = velocity;
     #ifdef DEBUG
     printf("Starting Vel: (%f %f %f)\n", vel.x, vel.y, vel.z);
-    //printf("Starting Dir: (%f %f %f)\n", dir.x, dir.y, dir.z);
     #endif
-    termVel = -5.0f;
+    termVel = -25.0f;
     col = color;
     col.x = glm::clamp(col.x, 0.0f, 1.0f);
     col.y = glm::clamp(col.y, 0.0f, 1.0f);
     col.z = glm::clamp(col.z, 0.0f, 1.0f);
-    //printf("Color: (%f %f %f)\n", col.x, col.y, col.z);
-    //col = color;
 }
 
 Particle::Particle(const glm::vec3& position, const glm::vec3& velocity, const glm::vec3& color,
@@ -75,43 +60,60 @@ Particle::Particle(const glm::vec3& position, const glm::vec3& velocity, const g
     
     curLife = 0.0f;
     float random = (float)rand() / RAND_MAX;
-    lifetime = 5.0f + (random - 0.5f) * liferand;
-    //printf("Lifetime: %f\n", lifetime);
-    //lifetime = life;
+    lifetime = life + (random * 2.0f - 1.0f) * liferand;
     gravity = grav;
     pos = position;
-    //dir = glm::normalize(velocity);
+    float rtheta = random * 2 * M_PI * dirrand;
+    //take the theta and rotate the vector arond it
+    //Rotate around vel direction as normal, then get a random vector perpendicular to that and rotate again
     vel = velocity;
+    glm::vec3 dir = glm::normalize(velocity);
+    vel = glm::rotate(vel, rtheta, dir);
+    vel = glm::rotate(vel, rtheta, glm::cross(velocity, glm::vec3((float)rand()/RAND_MAX, (float)rand() / RAND_MAX, (float)rand() / RAND_MAX)));
     #ifdef DEBUG
     printf("Starting Vel: (%f %f %f)\n", vel.x, vel.y, vel.z);
-    //printf("Starting Dir: (%f %f %f)\n", dir.x, dir.y, dir.z);
     #endif
-    termVel = -5.0f;
+    termVel = -25.0f;
     col = color + (random - 0.5f) * colrand;
     col.x = glm::clamp(col.x, 0.0f, 1.0f);
     col.y = glm::clamp(col.y, 0.0f, 1.0f);
     col.z = glm::clamp(col.z, 0.0f, 1.0f);
-    //printf("Color: (%f %f %f)\n", col.x, col.y, col.z);
-    //col = color;
 }
 
-bool Particle::update() {
-    //pos += dir*(vel*difTime);
-    pos += (vel*difTime);
-    #ifdef DEBUG
-    printf("Pos: (%f %f %f)\n", pos.x, pos.y, pos.z);
-    #endif
-    vel += gravity * difTime;
-    #ifdef DEBUG
-    printf("Updating Vel With (%f %f %f)\n", (gravity*difTime).x, (gravity*difTime).y, (gravity*difTime).z);
-    printf("New Vel: (%f %f %f)\n", vel.x, vel.y, vel.z);
-    #endif
+bool Particle::update(float* vertices, int size) {
+    //Nothing to check collisions with
+    if(vertices == 0) {
+        pos += (vel*difTime);
+        #ifdef DEBUG
+        printf("Pos: (%f %f %f)\n", pos.x, pos.y, pos.z);
+        #endif
+        vel += gravity * difTime;
+        #ifdef DEBUG
+        printf("Updating Vel With (%f %f %f)\n", (gravity*difTime).x, (gravity*difTime).y, (gravity*difTime).z);
+        printf("New Vel: (%f %f %f)\n", vel.x, vel.y, vel.z);
+        #endif
+    }
+    //Check collisions
+    else {
+        //get projected position
+        glm::vec3 newpos = pos + (vel * difTime);
+        glm::vec3 newvel = vel + (gravity * difTime);
+        //Check ray to projected position for collision
+        //glm::vec3 raypos = pos;
+        //glm::vec3 raydir = newpos - pos;
+        pos = newpos;
+        vel = newvel;
+    }
+    
     if(vel.y < termVel) {
         vel.y = termVel;
     }
-    curLife += difTime;
-    if(curLife >= lifetime) {
-        return false;
+    if(lifetime >= 0) {
+        curLife += difTime;
+        if(curLife >= lifetime) {
+            //printf("Life: %f\nCur Life: %f\n", lifetime, curLife);
+            return false;
+        }
     }
     return true;
 }
@@ -127,7 +129,7 @@ Emitter::Emitter() {
     vel = 5.0f;
     plimit = numParticles * refTime + (int)(numParticles * 0.1f);
     tottime = 0;
-    plife = 0.5f;
+    plife = 5.0f;
     liferand = 0.0f;
     colrand = 0.0f;
     dirrand = 0.0f;
@@ -144,7 +146,7 @@ Emitter::Emitter(bool start) {
     vel = 5.0f;
     plimit = numParticles * refTime + (int)(numParticles * 0.1f);
     tottime = 0;
-    plife = 0.5f;
+    plife = 5.0f;
     liferand = 0.0f;
     colrand = 0.0f;
     dirrand = 0.0f;
@@ -153,7 +155,7 @@ Emitter::Emitter(bool start) {
 Emitter::Emitter(int numPerSec) {
     numParticles = numPerSec;
     run = true;
-    refTime = 1.0f;
+    refTime = 3.0f;
     time = 0;
     pos = glm::vec3(0);
     dir = glm::vec3(0, 1, 0);
@@ -161,7 +163,7 @@ Emitter::Emitter(int numPerSec) {
     vel = 5.0f;
     plimit = numParticles * refTime + (int)(numParticles * 0.1f);
     tottime = 0;
-    plife = 0.5f;
+    plife = 5.0f;
     liferand = 0.0f;
     colrand = 0.0f;
     dirrand = 0.0f;
@@ -178,13 +180,13 @@ Emitter::Emitter(int numPerSec, bool start) {
     vel = 5.0f;
     plimit = numParticles * refTime + (int)(numParticles * 0.1f);
     tottime = 0;
-    plife = 0.5f;
+    plife = 5.0f;
     liferand = 0.0f;
     colrand = 0.0f;
     dirrand = 0.0f;
 }
 
-void Emitter::update() {
+void Emitter::update(float* vertices, int size) {
     if(paused) {
         return;
     }
@@ -197,8 +199,9 @@ void Emitter::update() {
     ///TODO - Possibly Parallelize?
     for(int i = 0; i < len; i++) {
         if(curParticles[i]) {
-            if(!particles[i].update()) {
+            if(!particles[i].update(0, 0)) {
                 curParticles[i] = false;
+                //printf("Killed\n");
             }
         }
     }
@@ -267,4 +270,28 @@ void Emitter::printParticlePos() {
         }
     }
     printf("\n");
+}
+
+void Emitter::render() {
+    int len = particles.size();
+    int totpart = 0;
+    Particle p;
+    glm::vec3 color;
+    glm::mat4 model;
+    for(int i = 0; i < len; i++) {
+        if(curParticles[i]) {
+            p = particles[i];
+            color = p.getColor();
+            GLint uniColor = glGetUniformLocation(shaderProgram, "inColor");
+            glUniform3f(uniColor, color.x, color.y, color.z);
+            
+            model = glm::mat4();
+            model = glm::translate(model, p.getPosition());
+            GLint uniModel = glGetUniformLocation(shaderProgram, "model");
+            glUniformMatrix4fv(uniModel, 1, GL_FALSE, glm::value_ptr(model));
+            glDrawArrays(GL_POINTS, 0, 1);
+            totpart++;
+        }
+    }
+    //printf("Rendered %d particles\n", totpart);
 }

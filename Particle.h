@@ -2,7 +2,23 @@
 #define PARTICLE_H_
 
 #include <vector>
+//#include "glm/glm.hpp"
+
+#include <GL/glew.h>   //Include order can matter here
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_opengl.h>
+
+#define GLM_FORCE_RADIANS
 #include "glm/glm.hpp"
+#include "glm/gtx/rotate_vector.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/type_ptr.hpp"
+
+class Intersection {
+    public:
+        glm::vec3 pos;
+        glm::vec3 norm;
+};
 
 class Particle {
     public:
@@ -14,7 +30,7 @@ class Particle {
         Particle(const glm::vec3& position, const glm::vec3& velocity, const glm::vec3& color,
                  float life, float liferand, float colrand, float dirrand, const glm::vec3& grav);
         
-        bool update(); //< returns false if the particle is to be destroyed
+        bool update(float* vertices, int size); //< returns false if the particle is to be destroyed
         
         void setLifetime(float life) { lifetime = life; }
         //void setLifeRandomness(float rand) { ltrand = rand; }
@@ -31,6 +47,8 @@ class Particle {
         glm::vec3 getVelocity() const { return vel; }
         glm::vec3 getColor() const { return col; }
     private:
+        Intersection* intersect(const glm::vec3& pos, const glm::vec3& dir, float* verts, int size);
+    
         float termVel;
         float curLife;
         float lifetime;
@@ -48,7 +66,8 @@ class Emitter {
         Emitter(int numPerSec);
         Emitter(int numPerSec, bool start);
         
-        void update();
+        void render();
+        void update(float* vertices, int size);
         void pause();
         void resume();
         void stop();
@@ -65,6 +84,7 @@ class Emitter {
         void setLifeRand(float rand) { liferand = rand; }
         void setColorRand(float rand) { colrand = rand; }
         void setDirectionRand(float rand) { dirrand = rand; }
+        void setShaderProgram(int prog) { shaderProgram = prog; }
         
         float getParticleRate() const { return numParticles; }
         glm::vec3 getPosition() const { return pos; }
@@ -86,6 +106,8 @@ class Emitter {
         bool run;
         bool paused;
         float lastTime;
+        
+        int shaderProgram;
         
         //emitter data
         glm::vec3 pos;
