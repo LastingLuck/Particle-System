@@ -30,7 +30,7 @@ class Particle {
         Particle(const glm::vec3& position, const glm::vec3& velocity, const glm::vec3& color,
                  float life, float liferand, float colrand, float dirrand, const glm::vec3& grav);
         
-        bool update(float* vertices, int size); //< returns false if the particle is to be destroyed
+        bool update(float* vertices, int size, bool grav); //< returns false if the particle is to be destroyed
         
         void setLifetime(float life) { lifetime = life; }
         //void setLifeRandomness(float rand) { ltrand = rand; }
@@ -66,7 +66,7 @@ class Emitter {
         Emitter(int numPerSec);
         Emitter(int numPerSec, bool start);
         
-        void render();
+        int render();
         void update(float* vertices, int size);
         void pause();
         void resume();
@@ -85,6 +85,8 @@ class Emitter {
         void setColorRand(float rand) { colrand = rand; }
         void setDirectionRand(float rand) { dirrand = rand; }
         void setShaderProgram(int prog) { shaderProgram = prog; }
+        void toggleGravity() { usegrav = !usegrav; }
+        void setRadius(float radius) { rad = clamp(radius, 0.0f, 100.0f); }
         
         float getParticleRate() const { return numParticles; }
         glm::vec3 getPosition() const { return pos; }
@@ -95,6 +97,8 @@ class Emitter {
         float getLifeRand() const { return liferand; }
         float getColorRand() const { return colrand; }
         float getDirectionRand() const { return dirrand; }
+        bool usingGravity() const { return usegrav; }
+        float getRadius() const { return rad; }
         
         std::vector<Particle> getParticles() const { return particles; }
         std::vector<bool> getLiveList() const { return curParticles; }
@@ -114,6 +118,8 @@ class Emitter {
         glm::vec3 dir;
         glm::vec3 col;
         float vel;
+        bool usegrav;
+        float rad;
         
         //Particle refactor
         int plimit;
@@ -128,6 +134,7 @@ class Emitter {
         
         void refactor();
         void printParticlePos();
+        float clamp(float value, float min, float max) { return (value < min) ? min : (value > max) ? max : value; }
 };
 
 #endif

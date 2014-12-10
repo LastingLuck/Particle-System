@@ -7,6 +7,7 @@
 extern float lastTime;
 extern float curTime;
 extern float difTime;
+extern int vNum;
 
 Particle::Particle() {
     curLife = 0.0f;
@@ -23,7 +24,6 @@ Particle::Particle(const glm::vec3& position, const glm::vec3& velocity,
         const glm::vec3& color) {
             
     curLife = 0.0f;
-    float random = (float)rand() / RAND_MAX;
     lifetime = -1;
     gravity = glm::vec3(0, -9.8f, 0);
     pos = position;
@@ -32,8 +32,10 @@ Particle::Particle(const glm::vec3& position, const glm::vec3& velocity,
     printf("Starting Vel: (%f %f %f)\n", vel.x, vel.y, vel.z);
     #endif
     termVel = -25.0f;
-    col = color + (random - 0.5f) * 0.3f;
-    //col = color;
+    col = color;
+    col.x = glm::clamp(col.x, 0.0f, 1.0f);
+    col.y = glm::clamp(col.y, 0.0f, 1.0f);
+    col.z = glm::clamp(col.z, 0.0f, 1.0f);
 }
 
 Particle::Particle(const glm::vec3& position, const glm::vec3& velocity, const glm::vec3& color,
@@ -63,31 +65,31 @@ Particle::Particle(const glm::vec3& position, const glm::vec3& velocity, const g
     lifetime = life + (random * 2.0f - 1.0f) * liferand;
     gravity = grav;
     pos = position;
-    float rtheta = random * 2 * M_PI * dirrand;
-    //take the theta and rotate the vector arond it
-    //Rotate around vel direction as normal, then get a random vector perpendicular to that and rotate again
+    float rtheta = ((random * 4 * M_PI) - (2 * M_PI)) * dirrand;
+    //Make a random vector and take the cross product of that and velocity. This gives
+    //us a random vector that's perpendicular to velocity. Rotate by a random amount around that axis
     vel = velocity;
-    glm::vec3 dir = glm::normalize(velocity);
-    vel = glm::rotate(vel, rtheta, dir);
-    vel = glm::rotate(vel, rtheta, glm::cross(velocity, glm::vec3((float)rand()/RAND_MAX, (float)rand() / RAND_MAX, (float)rand() / RAND_MAX)));
+    vel = glm::rotate(vel, rtheta, glm::cross(velocity, glm::vec3((float)rand()/RAND_MAX*2-1, (float)rand()/RAND_MAX*2-1, (float)rand()/RAND_MAX*2-1)));
     #ifdef DEBUG
     printf("Starting Vel: (%f %f %f)\n", vel.x, vel.y, vel.z);
     #endif
     termVel = -25.0f;
-    col = color + (random - 0.5f) * colrand;
+    col = color + (random*2.0f - 1.0f) * colrand;
     col.x = glm::clamp(col.x, 0.0f, 1.0f);
     col.y = glm::clamp(col.y, 0.0f, 1.0f);
     col.z = glm::clamp(col.z, 0.0f, 1.0f);
 }
 
-bool Particle::update(float* vertices, int size) {
+bool Particle::update(float* vertices, int size, bool grav) {
     //Nothing to check collisions with
     if(vertices == 0) {
         pos += (vel*difTime);
         #ifdef DEBUG
         printf("Pos: (%f %f %f)\n", pos.x, pos.y, pos.z);
         #endif
-        vel += gravity * difTime;
+        if(grav) {
+            vel += gravity * difTime;
+        }
         #ifdef DEBUG
         printf("Updating Vel With (%f %f %f)\n", (gravity*difTime).x, (gravity*difTime).y, (gravity*difTime).z);
         printf("New Vel: (%f %f %f)\n", vel.x, vel.y, vel.z);
@@ -133,6 +135,8 @@ Emitter::Emitter() {
     liferand = 0.0f;
     colrand = 0.0f;
     dirrand = 0.0f;
+    usegrav = true;
+    rad = 0.0f;
 }
 
 Emitter::Emitter(bool start) {
@@ -150,6 +154,8 @@ Emitter::Emitter(bool start) {
     liferand = 0.0f;
     colrand = 0.0f;
     dirrand = 0.0f;
+    usegrav = true;
+    rad = 0.0f;
 }
 
 Emitter::Emitter(int numPerSec) {
@@ -167,6 +173,8 @@ Emitter::Emitter(int numPerSec) {
     liferand = 0.0f;
     colrand = 0.0f;
     dirrand = 0.0f;
+    usegrav = true;
+    rad = 0.0f;
 }
 
 Emitter::Emitter(int numPerSec, bool start) {
@@ -184,6 +192,8 @@ Emitter::Emitter(int numPerSec, bool start) {
     liferand = 0.0f;
     colrand = 0.0f;
     dirrand = 0.0f;
+    usegrav = true;
+    rad = 0.0f;
 }
 
 void Emitter::update(float* vertices, int size) {
@@ -199,13 +209,14 @@ void Emitter::update(float* vertices, int size) {
     ///TODO - Possibly Parallelize?
     for(int i = 0; i < len; i++) {
         if(curParticles[i]) {
-            if(!particles[i].update(0, 0)) {
+            if(!particles[i].update(0, 0, usegrav)) {
                 curParticles[i] = false;
                 //printf("Killed\n");
             }
         }
     }
     //Spawn new particles
+    glm::vec3 newpos;
     if(run) {
         int newPartNum = 0;
         #ifdef DEBUG
@@ -220,12 +231,15 @@ void Emitter::update(float* vertices, int size) {
             tottime = fmod(tottime, (1.0f/numParticles));
         }
         for(int i = 0; i < newPartNum; i++) {
-            particles.push_back(Particle(pos, dir*vel, col, plife, liferand, colrand, dirrand, glm::vec3(0, -9.8f, 0)));
+            newpos = pos + glm::cross(dir, glm::vec3((float)rand()/RAND_MAX*2-1, (float)rand()/RAND_MAX*2-1, (float)rand()/RAND_MAX*2-1)) * rad;
+            //newpos = pos;
+            particles.push_back(Particle(newpos, dir*vel, col, plife, liferand, colrand, dirrand, glm::vec3(0, -9.8f, 0)));
             curParticles.push_back(true);
         }
+        tottime += difTime;
     }
     time += difTime;
-    tottime += difTime;
+    
     if(time >= refTime || (signed)particles.size() > plimit) {
         refactor();
         time = 0;
@@ -272,26 +286,40 @@ void Emitter::printParticlePos() {
     printf("\n");
 }
 
-void Emitter::render() {
+int Emitter::render() {
     int len = particles.size();
     int totpart = 0;
     Particle p;
     glm::vec3 color;
     glm::mat4 model;
+    GLint uniColor = glGetUniformLocation(shaderProgram, "inColor");
+    GLint uniModel = glGetUniformLocation(shaderProgram, "model");
+    
     for(int i = 0; i < len; i++) {
         if(curParticles[i]) {
             p = particles[i];
             color = p.getColor();
-            GLint uniColor = glGetUniformLocation(shaderProgram, "inColor");
             glUniform3f(uniColor, color.x, color.y, color.z);
             
             model = glm::mat4();
             model = glm::translate(model, p.getPosition());
-            GLint uniModel = glGetUniformLocation(shaderProgram, "model");
             glUniformMatrix4fv(uniModel, 1, GL_FALSE, glm::value_ptr(model));
             glDrawArrays(GL_POINTS, 0, 1);
             totpart++;
         }
     }
+    glm::vec3 axis = glm::cross(glm::vec3(0.f, 1.f, 0.f), dir);
+    if(axis.x == 0 && axis.y == 0 && axis.z == 0) {
+        axis = glm::vec3(-1.0f, 0.0f, 0.0f);
+    }
+    model = glm::mat4();
+    model = glm::rotate(model, (float)acos(glm::dot(glm::vec3(0.f, 1.f, 0.f), dir)), axis);
+    model = glm::translate(model, pos+glm::vec3(0.0f, -0.05f, 0.0f));
+    model = glm::scale(model, glm::vec3(0.1f, 0.1f, 0.1f));
+    
+    glUniformMatrix4fv(uniModel, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform3f(uniColor, col.x, col.y, col.z);
+    glDrawArrays(GL_TRIANGLES, 1, vNum);
     //printf("Rendered %d particles\n", totpart);
+    return totpart;
 }
