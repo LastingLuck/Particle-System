@@ -80,9 +80,9 @@ Particle::Particle(const glm::vec3& position, const glm::vec3& velocity, const g
     col.z = glm::clamp(col.z, 0.0f, 1.0f);
 }
 
-bool Particle::update(float* vertices, int size, bool grav) {
+bool Particle::update(float* vertices, int size, const std::vector<glm::vec3>& model, int stride, bool grav) {
     //Nothing to check collisions with
-    if(vertices == 0) {
+    if(vertices == 0 || size < 1) {
         pos += (vel*difTime);
         #ifdef DEBUG
         printf("Pos: (%f %f %f)\n", pos.x, pos.y, pos.z);
@@ -101,10 +101,51 @@ bool Particle::update(float* vertices, int size, bool grav) {
         glm::vec3 newpos = pos + (vel * difTime);
         glm::vec3 newvel = vel + (gravity * difTime);
         //Check ray to projected position for collision
-        //glm::vec3 raypos = pos;
-        //glm::vec3 raydir = newpos - pos;
-        pos = newpos;
-        vel = newvel;
+        glm::vec3 raypos = pos;
+        glm::vec3 raydir = newpos - pos;
+        //float tri[9]; //< (x,y,z)x3 Triangle
+        Intersection *is = 0, *closest = 0;
+        glm::vec3 tri[3];
+        int mindex = 0, tmpindex = 0;
+        for(int i = 0; i < size; i+=9) {
+            if(tmpindex >= stride) {
+                tmpindex = 0;
+                mindex++;
+            }
+            tmpindex++;
+            //printf("Pos: (%f %f %f)\n", vertices[i], vertices[i+1], vertices[i+2]);
+            //printf("Model Index: %d\n", mindex);
+            //printf("Model: (%f %f %f)\n", model[mindex].x, model[mindex].y, model[mindex].z);
+            tri[0] = glm::vec3(vertices[i], vertices[i+1], vertices[i+2]) + model[mindex];
+            tri[1] = glm::vec3(vertices[i+3], vertices[i+4], vertices[i+5]) + model[mindex];
+            tri[2] = glm::vec3(vertices[i+6], vertices[i+7], vertices[i+8]) + model[mindex];
+            //printf("New Pos: (%f %f %f)\n\n", tri[0].x, tri[0].y, tri[0].z);
+            if((is = intersect(raypos, raydir, tri))) {
+                if(closest == 0) {
+                    closest = new Intersection();
+                    closest->pos = is->pos;
+                    closest->norm = is->norm;
+                    closest->dsq = is->dsq;
+                }
+                else if(is->dsq < closest->dsq){
+                    closest->pos = is->pos;
+                    closest->norm = is->norm;
+                    closest->dsq = is->dsq;
+                }
+            }
+            if(is) {
+                delete is;
+            }
+        }
+        if(closest) {
+            newpos = closest->pos;
+            newvel = glm::vec3(0);
+            delete closest;
+        }
+        else {
+            pos = newpos;
+            vel = newvel; 
+        }
     }
     
     if(vel.y < termVel) {
@@ -118,6 +159,50 @@ bool Particle::update(float* vertices, int size, bool grav) {
         }
     }
     return true;
+}
+
+Intersection* Particle::intersect(const glm::vec3& pos, const glm::vec3& dir, glm::vec3 verts[]) {
+    Intersection* i = 0;
+    
+    //glm::vec3 t1 = glm::vec3(verts[0], verts[1], verts[2]);
+    //glm::vec3 t2 = glm::vec3(verts[3], verts[4], verts[5]);
+    //glm::vec3 t3 = glm::vec3(verts[6], verts[7], verts[8]);
+    glm::vec3 t1 = verts[0];
+    glm::vec3 t2 = verts[1];
+    glm::vec3 t3 = verts[2];
+    glm::vec3 dirn = glm::normalize(dir);
+    glm::vec3 ae = t1 - pos;
+    glm::vec3 ab = t1 - t2;
+    glm::vec3 ac = t1 - t3;
+    float detA = ab.x*(ac.y*dirn.z-dirn.y*ac.z) + ab.y*(ac.z*dirn.x-dirn.z*ac.x) + ab.z*(ac.x*dirn.y-ac.y*dirn.x);
+    float dett = ac.z*(ab.x*ae.y-ab.y*ae.x) + ac.y*(ae.x*ab.z-ab.x*ae.z) + ac.x*(ab.y*ae.z-ab.z*ae.y);
+    float tval = dett / detA;
+    if(tval > 0) {
+        return 0;
+    }
+    float detb = ae.x*(ac.y*dirn.z-dirn.y*ac.z) + ae.y*(ac.z*dirn.x-dirn.z*ac.x) + ae.z*(ac.x*dirn.y-ac.y*dirn.x);
+    float detg = dirn.z*(ab.x*ae.y-ae.x*ab.y) + dirn.y*(ab.z*ae.x-ae.z*ab.x) + dirn.x*(ab.y*ae.z-ae.y*ab.z);
+    float beta = detb / detA;
+    float gamma = detg / detA;
+    if(beta >= 0 && beta <= 1 && gamma >= 0  && gamma <= 1 && beta + gamma <= 1) {
+        glm::vec3 point = t1 + (((t2 - t1) * beta) + ((t3 - t1) * gamma));
+        glm::vec3 tmp = point - pos;
+        float dist = glm::dot(tmp, tmp);
+        if(dist <= 0.0001f || dist >= glm::dot(dir, dir)) {
+            return 0;
+        }
+        glm::vec3 normal = glm::cross(t2-t1, t3-t1);
+        float ang = glm::dot(normal, dir);
+        if(ang > 0) {
+            normal = normal * -1.0f;
+        }
+        i = new Intersection();
+        i->pos = point;
+        i->norm = normal;
+        i->dsq = dist;
+    }
+    
+    return i;
 }
 
 Emitter::Emitter() {
@@ -196,7 +281,7 @@ Emitter::Emitter(int numPerSec, bool start) {
     rad = 0.0f;
 }
 
-void Emitter::update(float* vertices, int size) {
+void Emitter::update(float* vertices, int size, const std::vector<glm::vec3>& model, int stride) {
     if(paused) {
         return;
     }
@@ -209,7 +294,7 @@ void Emitter::update(float* vertices, int size) {
     ///TODO - Possibly Parallelize?
     for(int i = 0; i < len; i++) {
         if(curParticles[i]) {
-            if(!particles[i].update(0, 0, usegrav)) {
+            if(!particles[i].update(vertices, size, model, stride, usegrav)) {
                 curParticles[i] = false;
                 //printf("Killed\n");
             }

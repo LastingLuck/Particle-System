@@ -1,3 +1,15 @@
+///TODO List
+/// - Collision Detection   x
+/// - Bouncing Particles
+/// - Sliding Particles
+/// - Get Geometry Shader working
+/// - Keybindings for dynamic stuff
+///     - Position
+///     - Direction
+///     - Randomness
+/// - Demo with permanent particles.
+
+
 #ifndef PARTICLE_H_
 #define PARTICLE_H_
 
@@ -18,6 +30,7 @@ class Intersection {
     public:
         glm::vec3 pos;
         glm::vec3 norm;
+        float dsq;
 };
 
 class Particle {
@@ -30,31 +43,27 @@ class Particle {
         Particle(const glm::vec3& position, const glm::vec3& velocity, const glm::vec3& color,
                  float life, float liferand, float colrand, float dirrand, const glm::vec3& grav);
         
-        bool update(float* vertices, int size, bool grav); //< returns false if the particle is to be destroyed
+        bool update(float* vertices, int size, const std::vector<glm::vec3>& model, int stride, bool grav); //< returns false if the particle is to be destroyed
         
         void setLifetime(float life) { lifetime = life; }
-        //void setLifeRandomness(float rand) { ltrand = rand; }
         void setGravity(float grav) { gravity = glm::vec3(0, grav, 0); }
         void setPosition(const glm::vec3& position) { pos = position; }
-        void setVelocity(const glm::vec3& velocity) { vel = velocity; dir = glm::normalize(velocity); }
+        void setVelocity(const glm::vec3& velocity) { vel = velocity; }
         void setColor(const glm::vec3& color) { col = color; }
         
         float getLifetime() const { return lifetime; }
-        //float getLifeRandomness() const { return ltrand; }
         glm::vec3 getGravity() const { return gravity; }
         glm::vec3 getPosition() const { return pos; }
-        glm::vec3 getDirection() const { return dir; }
         glm::vec3 getVelocity() const { return vel; }
         glm::vec3 getColor() const { return col; }
     private:
-        Intersection* intersect(const glm::vec3& pos, const glm::vec3& dir, float* verts, int size);
+        Intersection* intersect(const glm::vec3& pos, const glm::vec3& dir, glm::vec3 verts[]);
     
         float termVel;
         float curLife;
         float lifetime;
         glm::vec3 gravity;
         glm::vec3 pos;
-        glm::vec3 dir;
         glm::vec3 vel;
         glm::vec3 col;
 };
@@ -67,7 +76,7 @@ class Emitter {
         Emitter(int numPerSec, bool start);
         
         int render();
-        void update(float* vertices, int size);
+        void update(float* vertices, int size, const std::vector<glm::vec3>& model, int stride);
         void pause();
         void resume();
         void stop();

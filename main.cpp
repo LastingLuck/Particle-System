@@ -16,6 +16,7 @@ float rdirx = 0.0, rdiry = 0.0f, rdirz = 1.0f;
 int windowWidth = 800, windowHeight = 600;
 float mSense = 60.0f;
 int pointSize = 3;
+std::vector<glm::vec3> modelPos;
 
 bool DEBUG_ON = true;
 GLuint InitShader(const char* gShaderFileName, const char* vShaderFileName, const char* fShaderFileName);
@@ -59,6 +60,24 @@ int main(int argc, char** argv) {
 	int numVerts1 = numLines/8;
     vNum = numVerts1;
 	modelFile.close();
+    //for(int i = 0; i < numLines; i+=8) {
+    //    printf("(%f %f %f) (%f %f) (%f %f %f)\n", model1[i], model1[i+1], model1[i+2], model1[i+3], model1[i+4], model1[i+5], model1[i+6], model1[i+7]);
+    //}
+    int vSize = numVerts1*3;
+    float triverts[vSize];
+    int vIndex = 0;
+    for(int i = 0; i < numLines; i+=8) {
+        triverts[vIndex] = model1[i];
+        triverts[vIndex+1] = model1[i+1];
+        triverts[vIndex+2] = model1[i+2];
+        vIndex += 3;
+    }
+    //for(int i = 0; i < vSize; i+=3) {
+    //    printf("(%f %f %f)\n", triverts[i], triverts[i+1], triverts[i+2]);
+    //}
+    
+    //Hardcode positions of cubes
+    modelPos.push_back(glm::vec3(0.0f, 0.0f, 2.0f));
     
     //Point, plane (x, y, z), (x, y ,z), (x, y, z) x 2
     //float emitterData[21] = {0.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.5f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, -0.5f, 0.5f, 0.0f, 0.5f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f};
@@ -95,10 +114,10 @@ int main(int argc, char** argv) {
     std::vector<Particle> plist;
     std::vector<bool> livelist;
     Particle p;
-    Emitter* emitter = new Emitter(1200);
+    Emitter* emitter = new Emitter(1000);
     emitter->setColor(glm::vec3(1, 0, 0));
     emitter->setVelocity(5.0f);
-    emitter->setDirection(glm::vec3(0, 1, 0));
+    emitter->setDirection(glm::vec3(0, 1, 1));
     emitter->setParticleLife(5.0f);
     emitter->setDirectionRand(0.1f);
     emitter->setLifeRand(0.4f);
@@ -112,6 +131,7 @@ int main(int argc, char** argv) {
     curTime = lastTime;
     difTime = 0;
     float fpsTime = 0;
+    bool testIntersect = false;
     //Map of keys to states, with 0 and 1 being left and right mouse button
     std::map<char, bool> kmap;
     bool quit = false;
@@ -266,6 +286,15 @@ int main(int argc, char** argv) {
                     printf("Gravity Off\n");
                 }
             }
+            else if(windowEvent.type == SDL_KEYUP && windowEvent.key.keysym.sym == SDLK_i) {
+                testIntersect = !testIntersect;
+                if(testIntersect) {
+                    printf("Collision Detection On\n");
+                }
+                else {
+                    printf("Collision Detection Off\n");
+                }
+            }
         }
         if(quit) {
             break;
@@ -290,11 +319,27 @@ int main(int argc, char** argv) {
         glUniformMatrix4fv(uniProj, 1, GL_FALSE, glm::value_ptr(proj));
         int num = emitter->render();
         //Objects
+        GLint uniColor = glGetUniformLocation(shaderProgram, "inColor");
+        GLint uniModel = glGetUniformLocation(shaderProgram, "model");
+        for(int i = 0; i < (signed)modelPos.size(); i++) {
+            glUniform3f(uniColor, 0.5f, 0.5f, 0.5f);
+            
+            model = glm::mat4();
+            model = glm::translate(model, modelPos[i]);
+            glUniformMatrix4fv(uniModel, 1, GL_FALSE, glm::value_ptr(model));
+            glDrawArrays(GL_TRIANGLES, 1, numVerts1);
+        }
         
         lastTime = curTime;
         curTime = SDL_GetTicks()/1000.f;
         difTime = curTime - lastTime;
-        emitter->update(0, 0);
+        
+        if(testIntersect) {
+            emitter->update(triverts, vSize, modelPos, numVerts1);
+        }
+        else {
+            emitter->update(0, 0, modelPos, numVerts1);
+        }
         
         numFrames++;
         fpsTime += difTime;
