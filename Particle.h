@@ -1,13 +1,13 @@
 ///TODO List
 /// - Collision Detection   x
-/// - Bouncing Particles
-/// - Sliding Particles
+/// - Bouncing Particles    x
+/// - Sliding Particles     x
+/// - Demo with permanent particles.
 /// - Get Geometry Shader working
 /// - Keybindings for dynamic stuff
 ///     - Position
 ///     - Direction
 ///     - Randomness
-/// - Demo with permanent particles.
 
 
 #ifndef PARTICLE_H_
@@ -25,6 +25,7 @@
 #include "glm/gtx/rotate_vector.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
+#include "glm/gtx/string_cast.hpp"
 
 class Intersection {
     public:
@@ -41,9 +42,9 @@ class Particle {
         Particle(const glm::vec3& position, const glm::vec3& velocity, const glm::vec3& color,
                  float life, float liferand, const glm::vec3& grav);
         Particle(const glm::vec3& position, const glm::vec3& velocity, const glm::vec3& color,
-                 float life, float liferand, float colrand, float dirrand, const glm::vec3& grav);
+                 float life, float liferand, float colrand, float dirrand, const glm::vec3& grav, float bouncy);
         
-        bool update(float* vertices, int size, const std::vector<glm::vec3>& model, int stride, bool grav); //< returns false if the particle is to be destroyed
+        bool update(float* vertices, int size, const std::vector<glm::mat4>& model, int stride, bool grav); //< returns false if the particle is to be destroyed
         
         void setLifetime(float life) { lifetime = life; }
         void setGravity(float grav) { gravity = glm::vec3(0, grav, 0); }
@@ -66,6 +67,7 @@ class Particle {
         glm::vec3 pos;
         glm::vec3 vel;
         glm::vec3 col;
+        float bounce;
 };
 
 class Emitter {
@@ -76,7 +78,7 @@ class Emitter {
         Emitter(int numPerSec, bool start);
         
         int render();
-        void update(float* vertices, int size, const std::vector<glm::vec3>& model, int stride);
+        void update(float* vertices, int size, const std::vector<glm::mat4>& model, int stride);
         void pause();
         void resume();
         void stop();
@@ -96,6 +98,7 @@ class Emitter {
         void setShaderProgram(int prog) { shaderProgram = prog; }
         void toggleGravity() { usegrav = !usegrav; }
         void setRadius(float radius) { rad = clamp(radius, 0.0f, 100.0f); }
+        void setBounciness(float bounce) { bratio = clamp(bounce, 0.0f, 1.0f); }
         
         float getParticleRate() const { return numParticles; }
         glm::vec3 getPosition() const { return pos; }
@@ -108,6 +111,7 @@ class Emitter {
         float getDirectionRand() const { return dirrand; }
         bool usingGravity() const { return usegrav; }
         float getRadius() const { return rad; }
+        float getBounciness() const { return bratio; }
         
         std::vector<Particle> getParticles() const { return particles; }
         std::vector<bool> getLiveList() const { return curParticles; }
@@ -129,6 +133,7 @@ class Emitter {
         float vel;
         bool usegrav;
         float rad;
+        float bratio;
         
         //Particle refactor
         int plimit;

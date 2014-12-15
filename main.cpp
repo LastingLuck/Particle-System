@@ -2,6 +2,7 @@
 #include <map>
 #include <string>
 #include <fstream>
+#include <iostream>
 
 #include "Particle.h"
 
@@ -16,7 +17,7 @@ float rdirx = 0.0, rdiry = 0.0f, rdirz = 1.0f;
 int windowWidth = 800, windowHeight = 600;
 float mSense = 60.0f;
 int pointSize = 3;
-std::vector<glm::vec3> modelPos;
+std::vector<glm::mat4> modelPos;
 
 bool DEBUG_ON = true;
 GLuint InitShader(const char* gShaderFileName, const char* vShaderFileName, const char* fShaderFileName);
@@ -77,10 +78,14 @@ int main(int argc, char** argv) {
     //}
     
     //Hardcode positions of cubes
-    modelPos.push_back(glm::vec3(0.0f, 0.0f, 2.0f));
-    
-    //Point, plane (x, y, z), (x, y ,z), (x, y, z) x 2
-    //float emitterData[21] = {0.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.5f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, -0.5f, 0.5f, 0.0f, 0.5f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f};
+    glm::mat4 objmodel = glm::mat4();
+    objmodel = glm::translate(objmodel, glm::vec3(0.0f, 0.0f, 2.0f));
+    objmodel = glm::rotate(objmodel, .52359877559f, glm::vec3(1.f, 0.f, 0.f)); //30 deg
+    modelPos.push_back(objmodel);
+    objmodel = glm::mat4();
+    objmodel = glm::translate(objmodel, glm::vec3(0.0f, -2.0f, -0.0f));
+    objmodel = glm::rotate(objmodel, -.52359877559f, glm::vec3(1.f, 0.f, 0.f)); //30 deg
+    modelPos.push_back(objmodel);
     
     float vboData[numLines+8];
     float partData[8] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.5f, 0.5f};
@@ -114,15 +119,16 @@ int main(int argc, char** argv) {
     std::vector<Particle> plist;
     std::vector<bool> livelist;
     Particle p;
-    Emitter* emitter = new Emitter(1000);
+    Emitter* emitter = new Emitter(100);
     emitter->setColor(glm::vec3(1, 0, 0));
     emitter->setVelocity(5.0f);
-    emitter->setDirection(glm::vec3(0, 1, 1));
-    emitter->setParticleLife(5.0f);
-    emitter->setDirectionRand(0.1f);
-    emitter->setLifeRand(0.4f);
+    emitter->setDirection(glm::vec3(0, 1, 1.2f));
+    emitter->setParticleLife(3.0f);
+    emitter->setDirectionRand(0.03f);
+    emitter->setLifeRand(0.0f);
     emitter->setColorRand(1.0f);
     emitter->setShaderProgram(shaderProgram);
+    emitter->setBounciness(0.5f);
     
     SDL_SetWindowTitle(window, "FPS: 60    0 Particles");
     int numFrames = 0;
@@ -131,7 +137,7 @@ int main(int argc, char** argv) {
     curTime = lastTime;
     difTime = 0;
     float fpsTime = 0;
-    bool testIntersect = false;
+    bool testIntersect = true;
     //Map of keys to states, with 0 and 1 being left and right mouse button
     std::map<char, bool> kmap;
     bool quit = false;
@@ -324,9 +330,9 @@ int main(int argc, char** argv) {
         for(int i = 0; i < (signed)modelPos.size(); i++) {
             glUniform3f(uniColor, 0.5f, 0.5f, 0.5f);
             
-            model = glm::mat4();
-            model = glm::translate(model, modelPos[i]);
-            glUniformMatrix4fv(uniModel, 1, GL_FALSE, glm::value_ptr(model));
+            //model = glm::mat4();
+            //model = glm::translate(model, modelPos[i]);
+            glUniformMatrix4fv(uniModel, 1, GL_FALSE, glm::value_ptr(modelPos[i]));
             glDrawArrays(GL_TRIANGLES, 1, numVerts1);
         }
         
@@ -344,7 +350,6 @@ int main(int argc, char** argv) {
         numFrames++;
         fpsTime += difTime;
         if(fpsTime > 1.0f) {
-            //printf("FPS: %f\n", numFrames / fpsTime);
             SDL_SetWindowTitle(window, ("FPS: " + std::to_string(numFrames/fpsTime) + "    " + std::to_string(num).c_str() + " Particles").c_str());
             fpsTime -= 1.0f;
             numFrames = 0;
