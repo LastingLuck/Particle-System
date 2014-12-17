@@ -42,9 +42,10 @@ class Particle {
         Particle(const glm::vec3& position, const glm::vec3& velocity, const glm::vec3& color,
                  float life, float liferand, const glm::vec3& grav);
         Particle(const glm::vec3& position, const glm::vec3& velocity, const glm::vec3& color,
-                 float life, float liferand, float colrand, float dirrand, const glm::vec3& grav, float bouncy);
+                 float life, float liferand, float colrand, float dirrand, const glm::vec3& grav, 
+                 float bouncy, float termvel);
         
-        bool update(float* vertices, int size, const std::vector<glm::mat4>& model, int stride, bool grav); //< returns false if the particle is to be destroyed
+        bool update(float* vertices, int size, const std::vector<glm::mat4>& model, int stride, bool grav, const glm::vec3& force = glm::vec3(0.0f)); //< returns false if the particle is to be destroyed
         
         void setLifetime(float life) { lifetime = life; }
         void setGravity(float grav) { gravity = glm::vec3(0, grav, 0); }
@@ -78,7 +79,7 @@ class Emitter {
         Emitter(int numPerSec, bool start);
         
         int render();
-        void update(float* vertices, int size, const std::vector<glm::mat4>& model, int stride);
+        void update(float* vertices, int size, const std::vector<glm::mat4>& model, int stride, const glm::vec3& force = glm::vec3());
         void pause();
         void resume();
         void stop();
@@ -99,11 +100,15 @@ class Emitter {
         void toggleGravity() { usegrav = !usegrav; }
         void setRadius(float radius) { rad = clamp(radius, 0.0f, 100.0f); }
         void setBounciness(float bounce) { bratio = clamp(bounce, 0.0f, 1.0f); }
+        void setTermVelocity(float vel) { tvel = vel; }
+        void toggleTexture() { useTex = !useTex; }
+        void setGravity(const glm::vec3& gravity) { grav = gravity; }
         
         float getParticleRate() const { return numParticles; }
         glm::vec3 getPosition() const { return pos; }
         glm::vec3 getDirection() const { return dir; }
         glm::vec3 getColor() const { return col; }
+        glm::vec3 getGravity() const { return grav; }
         float getVelocity() const { return vel; }
         float getLifeTime() const { return plife; }
         float getLifeRand() const { return liferand; }
@@ -112,6 +117,8 @@ class Emitter {
         bool usingGravity() const { return usegrav; }
         float getRadius() const { return rad; }
         float getBounciness() const { return bratio; }
+        float getTermVelocity() const { return tvel; }
+        bool usingTexture() const { return useTex; }
         
         std::vector<Particle> getParticles() const { return particles; }
         std::vector<bool> getLiveList() const { return curParticles; }
@@ -123,6 +130,7 @@ class Emitter {
         bool run;
         bool paused;
         float lastTime;
+        bool useTex;
         
         int shaderProgram;
         
@@ -134,6 +142,9 @@ class Emitter {
         bool usegrav;
         float rad;
         float bratio;
+        float tvel;
+        GLuint tex0;
+        glm::vec3 grav;
         
         //Particle refactor
         int plimit;

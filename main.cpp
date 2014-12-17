@@ -3,6 +3,7 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <time.h>
 
 #include "Particle.h"
 
@@ -30,7 +31,7 @@ int main(int argc, char** argv) {
     //Ask SDL to get a recent version of OpenGL (3.2 or greater)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-	//SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
 	
 	//Create a window (offsetx, offsety, width, height, flags)
 	SDL_Window* window = SDL_CreateWindow("My OpenGL Program", 100, 100, windowWidth, windowHeight, SDL_WINDOW_OPENGL);
@@ -47,6 +48,8 @@ int main(int argc, char** argv) {
     GLuint vao;
 	glGenVertexArrays(1, &vao); //Create a VAO
 	glBindVertexArray(vao); //Bind the above created VAO to the current context
+    
+    srand(time(0));
     
     //Load Model 1
 	std::ifstream modelFile;
@@ -114,12 +117,15 @@ int main(int argc, char** argv) {
     
     glEnable(GL_DEPTH_TEST);
     SDL_Event windowEvent;
-    glPointSize(pointSize);
+    //glPointSize(pointSize);
+    GLint uniPSize = glGetUniformLocation(shaderProgram, "pSize");
+    glUniform1i(uniPSize, pointSize);
+    glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
     
     std::vector<Particle> plist;
     std::vector<bool> livelist;
     Particle p;
-    Emitter* emitter = new Emitter(100);
+    Emitter* emitter = new Emitter(250);
     emitter->setColor(glm::vec3(1, 0, 0));
     emitter->setVelocity(5.0f);
     emitter->setDirection(glm::vec3(0, 1, 1.2f));
@@ -141,6 +147,7 @@ int main(int argc, char** argv) {
     //Map of keys to states, with 0 and 1 being left and right mouse button
     std::map<char, bool> kmap;
     bool quit = false;
+    bool wind = false;
     while(true) {
         while(SDL_PollEvent(&windowEvent)) {
             if (windowEvent.type == SDL_QUIT) {
@@ -272,7 +279,7 @@ int main(int argc, char** argv) {
             }
             else if(windowEvent.type == SDL_KEYUP && windowEvent.key.keysym.sym == SDLK_EQUALS) {
                 ++pointSize;
-                glPointSize(pointSize);
+                glUniform1i(uniPSize, pointSize);
                 printf("Point Size: %d\n", pointSize);
             }
             else if(windowEvent.type == SDL_KEYUP && windowEvent.key.keysym.sym == SDLK_MINUS) {
@@ -280,7 +287,7 @@ int main(int argc, char** argv) {
                 if(pointSize < 1) {
                     pointSize = 1;
                 }
-                glPointSize(pointSize);
+                glUniform1i(uniPSize, pointSize);
                 printf("Point Size: %d\n", pointSize);
             }
             else if(windowEvent.type == SDL_KEYUP && windowEvent.key.keysym.sym == SDLK_g) {
@@ -299,6 +306,15 @@ int main(int argc, char** argv) {
                 }
                 else {
                     printf("Collision Detection Off\n");
+                }
+            }
+            else if(windowEvent.type == SDL_KEYUP && windowEvent.key.keysym.sym == SDLK_w) {
+                wind = !wind;
+                if(wind) {
+                    printf("Wind On\n");
+                }
+                else {
+                    printf("Wind Off\n");
                 }
             }
         }
@@ -324,6 +340,7 @@ int main(int argc, char** argv) {
         GLint uniProj = glGetUniformLocation(shaderProgram, "proj");
         glUniformMatrix4fv(uniProj, 1, GL_FALSE, glm::value_ptr(proj));
         int num = emitter->render();
+        glUniform1i(glGetUniformLocation(shaderProgram, "texID"), -1);
         //Objects
         GLint uniColor = glGetUniformLocation(shaderProgram, "inColor");
         GLint uniModel = glGetUniformLocation(shaderProgram, "model");
@@ -341,10 +358,20 @@ int main(int argc, char** argv) {
         difTime = curTime - lastTime;
         
         if(testIntersect) {
-            emitter->update(triverts, vSize, modelPos, numVerts1);
+            if(wind) {
+                emitter->update(triverts, vSize, modelPos, numVerts1, glm::vec3(0.0f, 0.0f, 1.0f));
+            }
+            else {
+                emitter->update(triverts, vSize, modelPos, numVerts1);
+            }
         }
         else {
-            emitter->update(0, 0, modelPos, numVerts1);
+            if(wind) {
+                emitter->update(0, 0, modelPos, numVerts1, glm::vec3(0.0f, 0.0f, 1.0f));
+            }
+            else {
+                emitter->update(0, 0, modelPos, numVerts1);
+            }
         }
         
         numFrames++;

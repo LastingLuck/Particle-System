@@ -16,8 +16,9 @@ Particle::Particle() {
     gravity = glm::vec3(0, -9.8f, 0);
     pos = glm::vec3(0);
     vel = glm::vec3(0, 5.0f, 0);
-    termVel = -25.0f;
+    termVel = 25.0f;
     col = glm::vec3(.5);
+    bounce = 0.7f;
 }
 
 Particle::Particle(const glm::vec3& position, const glm::vec3& velocity, 
@@ -31,11 +32,12 @@ Particle::Particle(const glm::vec3& position, const glm::vec3& velocity,
     #ifdef DEBUG
     printf("Starting Vel: (%f %f %f)\n", vel.x, vel.y, vel.z);
     #endif
-    termVel = -25.0f;
+    termVel = 25.0f;
     col = color;
     col.x = glm::clamp(col.x, 0.0f, 1.0f);
     col.y = glm::clamp(col.y, 0.0f, 1.0f);
     col.z = glm::clamp(col.z, 0.0f, 1.0f);
+    bounce = 0.7f;
 }
 
 Particle::Particle(const glm::vec3& position, const glm::vec3& velocity, const glm::vec3& color,
@@ -50,15 +52,16 @@ Particle::Particle(const glm::vec3& position, const glm::vec3& velocity, const g
     #ifdef DEBUG
     printf("Starting Vel: (%f %f %f)\n", vel.x, vel.y, vel.z);
     #endif
-    termVel = -25.0f;
+    termVel = 25.0f;
     col = color;
     col.x = glm::clamp(col.x, 0.0f, 1.0f);
     col.y = glm::clamp(col.y, 0.0f, 1.0f);
     col.z = glm::clamp(col.z, 0.0f, 1.0f);
+    bounce = 0.7f;
 }
 
 Particle::Particle(const glm::vec3& position, const glm::vec3& velocity, const glm::vec3& color,
-         float life, float liferand, float colrand, float dirrand, const glm::vec3& grav, float bouncy)  {
+         float life, float liferand, float colrand, float dirrand, const glm::vec3& grav, float bouncy, float termvel)  {
     
     curLife = 0.0f;
     float random = (float)rand() / RAND_MAX;
@@ -73,7 +76,7 @@ Particle::Particle(const glm::vec3& position, const glm::vec3& velocity, const g
     #ifdef DEBUG
     printf("Starting Vel: (%f %f %f)\n", vel.x, vel.y, vel.z);
     #endif
-    termVel = -25.0f;
+    termVel = termvel;
     col = color + (random*2.0f - 1.0f) * colrand;
     col.x = glm::clamp(col.x, 0.0f, 1.0f);
     col.y = glm::clamp(col.y, 0.0f, 1.0f);
@@ -81,7 +84,7 @@ Particle::Particle(const glm::vec3& position, const glm::vec3& velocity, const g
     bounce = glm::clamp(bouncy, 0.0f, 1.0f);
 }
 
-bool Particle::update(float* vertices, int size, const std::vector<glm::mat4>& model, int stride, bool grav) {
+bool Particle::update(float* vertices, int size, const std::vector<glm::mat4>& model, int stride, bool grav, const glm::vec3& force) {
     //Nothing to check collisions with
     if(vertices == 0 || size < 1) {
         pos += (vel*difTime);
@@ -91,6 +94,7 @@ bool Particle::update(float* vertices, int size, const std::vector<glm::mat4>& m
         if(grav) {
             vel += gravity * difTime;
         }
+        vel += force * difTime;
         #ifdef DEBUG
         printf("Updating Vel With (%f %f %f)\n", (gravity*difTime).x, (gravity*difTime).y, (gravity*difTime).z);
         printf("New Vel: (%f %f %f)\n", vel.x, vel.y, vel.z);
@@ -100,14 +104,18 @@ bool Particle::update(float* vertices, int size, const std::vector<glm::mat4>& m
     else {
         //get projected position
         glm::vec3 newpos = pos + (vel * difTime);
-        glm::vec3 newvel = vel + (gravity * difTime);
+        glm::vec3 newvel = vel;
+        if(grav) {
+            newvel = vel + (gravity * difTime);
+        }
+        newvel += force * difTime;
         //Check ray to projected position for collision
         glm::vec3 raypos = pos;
         glm::vec3 raydir = newpos - pos;
         Intersection *is = 0, *closest = 0;
         glm::vec3 tri[3];
         int mindex = 0, tmpindex = 0;
-        for(int i = 0; i < (signed)size*model.size(); i+=9) {
+        for(int i = 0; i < size*(signed)model.size(); i+=9) {
             if(tmpindex >= stride) {
                 tmpindex = 0;
                 mindex++;
@@ -135,8 +143,8 @@ bool Particle::update(float* vertices, int size, const std::vector<glm::mat4>& m
         }
         if(closest) {
             newpos = pos + (closest->pos - pos) * (1 - 0.1f*glm::length(closest->pos));
-            newvel = glm::reflect(newvel, closest->norm) * bounce;
-            if(glm::length(newvel) < 1.0f) {
+            glm::vec3 bvel = glm::reflect(newvel, closest->norm) * bounce;
+            if(glm::length(bvel) < 1.0f) {
                 //Cross normal and gravity
                 //Cross that with normal
                 //project velocity onto it
@@ -145,10 +153,12 @@ bool Particle::update(float* vertices, int size, const std::vector<glm::mat4>& m
                     newvel = glm::vec3(0);
                 }
                 else {
-                    
                     slidevec = glm::cross(slidevec, closest->norm);
                     newvel = (glm::dot(newvel, slidevec) / glm::dot(slidevec, slidevec)) * slidevec;
                 }
+            }
+            else {
+                newvel = bvel;
             }
             delete closest;
         }
@@ -156,8 +166,11 @@ bool Particle::update(float* vertices, int size, const std::vector<glm::mat4>& m
         vel = newvel; 
     }
     
-    if(vel.y < termVel) {
-        vel.y = termVel;
+    if(glm::length(vel) > termVel) {
+        vel = glm::normalize(vel) * termVel;
+        if(force.x != 0.0f && force.y != 0.0f && force.z != 0.0f) {
+            vel += force * difTime;
+        }
     }
     if(lifetime >= 0) {
         curLife += difTime;
@@ -181,7 +194,7 @@ Intersection* Particle::intersect(const glm::vec3& pos, const glm::vec3& dir, gl
     float detA = ab.x*(ac.y*dirn.z-dirn.y*ac.z) + ab.y*(ac.z*dirn.x-dirn.z*ac.x) + ab.z*(ac.x*dirn.y-ac.y*dirn.x);
     float dett = ac.z*(ab.x*ae.y-ab.y*ae.x) + ac.y*(ae.x*ab.z-ab.x*ae.z) + ac.x*(ab.y*ae.z-ab.z*ae.y);
     float tval = dett / detA;
-    if(tval > 0) {
+    if(tval > 0.001f) {
         return 0;
     }
     float detb = ae.x*(ac.y*dirn.z-dirn.y*ac.z) + ae.y*(ac.z*dirn.x-dirn.z*ac.x) + ae.z*(ac.x*dirn.y-ac.y*dirn.x);
@@ -227,6 +240,28 @@ Emitter::Emitter() {
     usegrav = true;
     rad = 0.0f;
     bratio = 0.0f;
+    tvel = 25.0f;
+    grav = glm::vec3(0, -9.8f, 0);
+    
+    //// Allocate Texture 0 (Snow) ///////
+	SDL_Surface* surface = SDL_LoadBMP("particleTexture.bmp");
+	if (surface==NULL){ //If it failed, print the error
+        printf("Error: \"%s\"\n",SDL_GetError()); return;
+    }
+    glGenTextures(1, &tex0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex0);
+    ///What to do outside 0-1 range
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    ///Load the texture into memory
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, surface->w,surface->h, 0, GL_BGR,GL_UNSIGNED_BYTE,surface->pixels);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    SDL_FreeSurface(surface);
+    //// End Allocate Texture ///////
+    useTex = false;
 }
 
 Emitter::Emitter(bool start) {
@@ -247,6 +282,28 @@ Emitter::Emitter(bool start) {
     usegrav = true;
     rad = 0.0f;
     bratio = 0.0f;
+    tvel = 25.0f;
+    grav = glm::vec3(0, -9.8f, 0);
+    
+    //// Allocate Texture 0 (Snow) ///////
+	SDL_Surface* surface = SDL_LoadBMP("particleTexture.bmp");
+	if (surface==NULL){ //If it failed, print the error
+        printf("Error: \"%s\"\n",SDL_GetError()); return;
+    }
+    glGenTextures(1, &tex0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex0);
+    ///What to do outside 0-1 range
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    ///Load the texture into memory
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, surface->w,surface->h, 0, GL_BGR,GL_UNSIGNED_BYTE,surface->pixels);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    SDL_FreeSurface(surface);
+    //// End Allocate Texture ///////
+    useTex = false;
 }
 
 Emitter::Emitter(int numPerSec) {
@@ -267,6 +324,28 @@ Emitter::Emitter(int numPerSec) {
     usegrav = true;
     rad = 0.0f;
     bratio = 0.0f;
+    tvel = 25.0f;
+    grav = glm::vec3(0, -9.8f, 0);
+    
+    //// Allocate Texture 0 (Snow) ///////
+	SDL_Surface* surface = SDL_LoadBMP("particleTexture.bmp");
+	if (surface==NULL){ //If it failed, print the error
+        printf("Error: \"%s\"\n",SDL_GetError()); return;
+    }
+    glGenTextures(1, &tex0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex0);
+    ///What to do outside 0-1 range
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    ///Load the texture into memory
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, surface->w,surface->h, 0, GL_BGR,GL_UNSIGNED_BYTE,surface->pixels);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    SDL_FreeSurface(surface);
+    //// End Allocate Texture ///////
+    useTex = false;
 }
 
 Emitter::Emitter(int numPerSec, bool start) {
@@ -287,9 +366,31 @@ Emitter::Emitter(int numPerSec, bool start) {
     usegrav = true;
     rad = 0.0f;
     bratio = 0.0f;
+    tvel = 25.0f;
+    grav = glm::vec3(0, -9.8f, 0);
+    
+    //// Allocate Texture 0 (Snow) ///////
+	SDL_Surface* surface = SDL_LoadBMP("particleTexture.bmp");
+	if (surface==NULL){ //If it failed, print the error
+        printf("Error: \"%s\"\n",SDL_GetError()); return;
+    }
+    glGenTextures(1, &tex0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex0);
+    ///What to do outside 0-1 range
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    ///Load the texture into memory
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, surface->w,surface->h, 0, GL_BGR,GL_UNSIGNED_BYTE,surface->pixels);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    SDL_FreeSurface(surface);
+    //// End Allocate Texture ///////
+    useTex = false;
 }
 
-void Emitter::update(float* vertices, int size, const std::vector<glm::mat4>& model, int stride) {
+void Emitter::update(float* vertices, int size, const std::vector<glm::mat4>& model, int stride, const glm::vec3& force) {
     if(paused) {
         return;
     }
@@ -300,10 +401,11 @@ void Emitter::update(float* vertices, int size, const std::vector<glm::mat4>& mo
     //Update current particles
     int len = particles.size();
     ///TODO - Possibly Parallelize?
+    #pragma omp parallel for schedule(static, 125)
     for(int i = 0; i < len; i++) {
         if(curParticles[i]) {
             //printf("Updating Particle at Pos: (%f %f %f)\n", particles[i].getPosition().x, particles[i].getPosition().y, particles[i].getPosition().z);
-            if(!particles[i].update(vertices, size, model, stride, usegrav)) {
+            if(!particles[i].update(vertices, size, model, stride, usegrav, force)) {
                 curParticles[i] = false;
                 //printf("Killed\n");
             }
@@ -327,7 +429,7 @@ void Emitter::update(float* vertices, int size, const std::vector<glm::mat4>& mo
         for(int i = 0; i < newPartNum; i++) {
             newpos = pos + glm::cross(dir, glm::vec3((float)rand()/RAND_MAX*2-1, (float)rand()/RAND_MAX*2-1, (float)rand()/RAND_MAX*2-1)) * rad;
             //newpos = pos;
-            particles.push_back(Particle(newpos, dir*vel, col, plife, liferand, colrand, dirrand, glm::vec3(0, -9.8f, 0), bratio));
+            particles.push_back(Particle(newpos, dir*vel, col, plife, liferand, colrand, dirrand, grav, bratio, tvel));
             curParticles.push_back(true);
         }
         tottime += difTime;
@@ -388,7 +490,18 @@ int Emitter::render() {
     glm::mat4 model;
     GLint uniColor = glGetUniformLocation(shaderProgram, "inColor");
     GLint uniModel = glGetUniformLocation(shaderProgram, "model");
-    
+    //Bind texture for particles
+    GLint uniTexID = glGetUniformLocation(shaderProgram, "texID");
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex0);
+    glUniform1i(glGetUniformLocation(shaderProgram, "tex"), 0);
+    if(useTex) {
+        glUniform1i(uniTexID, 0);
+    }
+    else {
+        glUniform1i(uniTexID, -1);
+    }
+    //Draw Particles
     for(int i = 0; i < len; i++) {
         if(curParticles[i]) {
             p = particles[i];
@@ -402,6 +515,7 @@ int Emitter::render() {
             totpart++;
         }
     }
+    glUniform1i(uniTexID, -1);
     glm::vec3 axis = glm::cross(glm::vec3(0.f, 1.f, 0.f), dir);
     if(axis.x == 0 && axis.y == 0 && axis.z == 0) {
         axis = glm::vec3(-1.0f, 0.0f, 0.0f);
