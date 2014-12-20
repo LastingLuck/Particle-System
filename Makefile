@@ -21,19 +21,19 @@ smoke: main4.o Particle.o
 	$(CC) $(CFLAGS) $(LFLAGS) $(DFLAG) $^ -o $@
 
 main.o: main.cpp
-	$(CC) $(CFLAGS) $(LFLAGS) $(DFLAG) -c $^
+	$(CC) $(CFLAGS) $(DFLAG) -c $^
 
 main2.o: main2.cpp
-	$(CC) $(CFLAGS) $(LFLAGS) $(DFLAG) -c $^
+	$(CC) $(CFLAGS) $(DFLAG) -c $^
 
 main3.o: main3.cpp
-	$(CC) $(CFLAGS) $(LFLAGS) $(DFLAG) -c $^
+	$(CC) $(CFLAGS) $(DFLAG) -c $^
 
 main4.o: main4.cpp
-	$(CC) $(CFLAGS) $(LFLAGS) $(DFLAG) -c $^
+	$(CC) $(CFLAGS) $(DFLAG) -c $^
 
-Particle.o: Particle.cpp Particle.h
-	$(CC) $(CFLAGS) $(LFLAGS) $(DFLAG) -c $^
+Particle.o: Particle.cpp
+	$(CC) $(CFLAGS) $(DFLAG) -c $^
 
 clean:
 	rm -rf *.o particles staticParticles windParticles smoke
