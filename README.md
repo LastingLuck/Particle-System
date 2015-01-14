@@ -1,1 +1,1 @@
-Visit [this page](https://sites.google.com/site/alexdahl5607/simple-particle-system) for more info
+A simple implementation of a particle system. Implemented using OpenGL 3 and SDL 2. Visit [this page](https://sites.google.com/site/alexdahl5607/simple-particle-system) for more info.
