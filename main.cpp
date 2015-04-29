@@ -21,7 +21,7 @@ int pointSize = 3;
 std::vector<glm::mat4> modelPos;
 
 bool DEBUG_ON = true;
-GLuint InitShader(const char* gShaderFileName, const char* vShaderFileName, const char* fShaderFileName);
+GLuint InitShader(const char* vShaderFileName, const char* fShaderFileName);
 bool fullscreen = false;
 void Win2PPM(int width, int height);
 
@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
 	glBindBuffer(GL_ARRAY_BUFFER, vbo[0]); //Set the vbo as the active array buffer (Only one buffer can be active at a time)
 	glBufferData(GL_ARRAY_BUFFER, (numLines+8)*sizeof(float), vboData, GL_STATIC_DRAW); //upload vertices to vbo
     
-    int shaderProgram = InitShader("geometry.glsl", "vertex.glsl", "fragment.glsl");
+    int shaderProgram = InitShader("vertex.glsl", "fragment.glsl");
 	glUseProgram(shaderProgram); //Set the active shader (only one can be used at a time)
     printf("Shader Compiled\n");
     
@@ -433,10 +433,10 @@ static char* readShaderSource(const char* shaderFile)
 }
 
 // Create a GLSL program object from vertex and fragment shader files
-GLuint InitShader(const char* gShaderFileName, const char* vShaderFileName, const char* fShaderFileName)
+GLuint InitShader(const char* vShaderFileName, const char* fShaderFileName)
 {
-	GLuint geometry_shader, vertex_shader, fragment_shader;
-	GLchar *gs_text, *vs_text, *fs_text;
+	GLuint vertex_shader, fragment_shader;
+	GLchar *vs_text, *fs_text;
 	GLuint program;
 
 	// check GLSL version
@@ -444,12 +444,10 @@ GLuint InitShader(const char* gShaderFileName, const char* vShaderFileName, cons
 
 	// Create shader handlers
 	vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-    geometry_shader = glCreateShader(GL_GEOMETRY_SHADER);
 	fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
 
 	// Read source code from shader files
 	vs_text = readShaderSource(vShaderFileName);
-    gs_text = readShaderSource(gShaderFileName);
 	fs_text = readShaderSource(fShaderFileName);
 
 	// error check
@@ -461,15 +459,6 @@ GLuint InitShader(const char* gShaderFileName, const char* vShaderFileName, cons
 		printf("%s\n", vs_text);
 		printf("=====================\n\n");
 	}
-    if(gs_text == NULL) {
-        printf("Failed to read from geometry shader file %s\n", gShaderFileName);
-		exit(1);
-    }
-    else if(DEBUG_ON) {
-        printf("Geometry Shader:\n=====================\n");
-		printf("%s\n", gs_text);
-		printf("=====================\n\n");
-    }
 	if (fs_text == NULL) {
 		printf("Failed to read from fragent shader file %s\n", fShaderFileName);
 		exit(1);
@@ -501,33 +490,12 @@ GLuint InitShader(const char* gShaderFileName, const char* vShaderFileName, cons
 		exit(1);
 	}
     
-    // Load Geometry Shader
-    const char *gg = gs_text;
-	glShaderSource(geometry_shader, 1, &gg, NULL);  //Read source
-	glCompileShader(geometry_shader); // Compile shaders
-    //Check for errors
-	glGetShaderiv(geometry_shader, GL_COMPILE_STATUS, &compiled);
-	if (!compiled) {
-		printf("Geometry shader failed to compile:\n");
-		if (DEBUG_ON) {
-			GLint logMaxSize, logLength;
-			glGetShaderiv(geometry_shader, GL_INFO_LOG_LENGTH, &logMaxSize);
-			printf("printing error message of %d bytes\n", logMaxSize);
-			char* logMsg = new char[logMaxSize];
-			glGetShaderInfoLog(geometry_shader, logMaxSize, &logLength, logMsg);
-			printf("%d bytes retrieved\n", logLength);
-			printf("error message: %s\n", logMsg);
-			delete[] logMsg;
-		}
-		exit(1);
-	}
 	
 	// Load Fragment Shader
 	const char *ff = fs_text;
 	glShaderSource(fragment_shader, 1, &ff, NULL);
 	glCompileShader(fragment_shader);
 	glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &compiled);
-	
 	//Check for Errors
 	if (!compiled) {
 		printf("Fragment shader failed to compile\n");
@@ -549,7 +517,6 @@ GLuint InitShader(const char* gShaderFileName, const char* vShaderFileName, cons
 
 	// Attach shaders to program
 	glAttachShader(program, vertex_shader);
-    glAttachShader(program, geometry_shader);
 	glAttachShader(program, fragment_shader);
 
 	// Link and set program to use

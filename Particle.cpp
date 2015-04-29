@@ -142,7 +142,7 @@ bool Particle::update(float* vertices, int size, const std::vector<glm::mat4>& m
             }
         }
         if(closest) {
-            newpos = pos + (closest->pos - pos) * (1 - 0.1f*glm::length(closest->pos));
+            newpos = pos + (closest->pos - pos) * (1 - 0.2f*glm::length(closest->pos));
             glm::vec3 bvel = glm::reflect(newvel, closest->norm) * bounce;
             if(glm::length(bvel) < 1.0f) {
                 //Cross normal and gravity

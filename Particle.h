@@ -3,7 +3,6 @@
 /// - Bouncing Particles    x
 /// - Sliding Particles     x
 /// - Demo with permanent particles.
-/// - Get Geometry Shader working
 /// - Keybindings for dynamic stuff
 ///     - Position
 ///     - Direction
@@ -46,12 +45,14 @@ class Particle {
                  float bouncy, float termvel);
         
         bool update(float* vertices, int size, const std::vector<glm::mat4>& model, int stride, bool grav, const glm::vec3& force = glm::vec3(0.0f)); //< returns false if the particle is to be destroyed
+        bool update(bool grav, const glm::vec3& force = glm::vec3(0.0f));
         
         void setLifetime(float life) { lifetime = life; }
         void setGravity(float grav) { gravity = glm::vec3(0, grav, 0); }
         void setPosition(const glm::vec3& position) { pos = position; }
         void setVelocity(const glm::vec3& velocity) { vel = velocity; }
         void setColor(const glm::vec3& color) { col = color; }
+        void markDead() { curLife = lifetime; }
         
         float getLifetime() const { return lifetime; }
         glm::vec3 getGravity() const { return gravity; }
